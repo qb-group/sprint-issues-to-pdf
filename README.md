@@ -47,6 +47,7 @@
   GITHUB_PROJECT_ID={target project number}
   GITHUB_PROJECT_STATUS={status name}
   GITHUB_PROJECT_ITERATION={"iteraion name":"iteration title",...}
+  SKIP_PROMPT={true|false}
   ```
 
     * example
@@ -60,6 +61,8 @@
       GITHUB_PROJECT_STATUS=In progress,Epic,Next
       # interation name: title
       GITHUB_PROJECT_ITERATION={"iteraion1":"sprint 2","iteraion2":"sprint 3"}
+      # skip prompt for proceed; false by default
+      GITHUB_PROMPT=true
       ```
 
 - Installation

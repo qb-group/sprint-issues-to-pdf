@@ -5,13 +5,16 @@ const GITHUB_ORG: string = <string>process.env.GITHUB_ORG;
 const GITHUB_PROJECT_ID: number = <number>_.toNumber(process.env.GITHUB_PROJECT_ID);
 const GITHUB_PROJECT_STATUS: string = <string>process.env.GITHUB_PROJECT_STATUS;
 const GITHUB_PROJECT_ITERATION: string = <string>process.env.GITHUB_PROJECT_ITERATION;
+const SKIP_PROMPT: string = <string>process.env.SKIP_PROMPT;
 
 export interface GITHUB_PROJECT {
   id: string;
   number: number;
   title: string;
   createdAt: string;
-  columns?: string[]; 
+  columns: string[];
+  statusFields: string[];
+  isSkipPrompt: boolean;
   iterations?: any;
 }
 
@@ -59,7 +62,7 @@ const getProjects = async (orglogin: string): Promise<any> => {
   let afterCursor: string = '';
 
   try {
-    while(hasNextPage) {
+    while (hasNextPage) {
       const result = await graphqlClient(queryProjects(orglogin, afterCursor, STEP));
       const projectsV2: any = _.get(result, 'organization.projectsV2');
       const pageInfo: any = projectsV2.pageInfo;
@@ -68,7 +71,7 @@ const getProjects = async (orglogin: string): Promise<any> => {
       hasNextPage = pageInfo.hasNextPage
       projects = _.concat(projects, projectsV2.nodes);
     }
-    console.log(`[getProjects] total:${total}, issues count: ${_.size(projects)}`);    
+    console.log(`[getProjects] total:${total}, issues count: ${_.size(projects)}`);
   } catch (error: any) {
     console.log('Request failed:', error.request);
     console.log(error.message);
@@ -95,20 +98,30 @@ const getIterations = (): any => {
   return result;
 }
 
-export const getProjectInfo =async (): Promise<GITHUB_PROJECT> => {
+export const getProjectInfo = async (): Promise<GITHUB_PROJECT> => {
   const orglogin: string = GITHUB_ORG;
-  const projectid: number = GITHUB_PROJECT_ID; 
+  const projectid: number = GITHUB_PROJECT_ID;
+  const isSkipPrompt: boolean = SKIP_PROMPT === 'true' ? true : false;
   let project: GITHUB_PROJECT;
 
   try {
     const projectResult = await graphqlClient(queryProjectInfo(orglogin, projectid));
+    //console.log(`projectInfo: ${JSON.stringify(projectResult)}`)
     project = {
       id: _.get(projectResult, 'organization.projectV2.id'),
       number: _.get(projectResult, 'organization.projectV2.number'),
       title: _.get(projectResult, 'organization.projectV2.title'),
       createdAt: _.get(projectResult, 'organization.projectV2.createdAt'),
+      statusFields: _.map(
+        _.get(
+          _.find(
+            _.get(projectResult, 'organization.projectV2.fields.nodes'),
+            { name: 'Status' }),
+          'options'),
+        'name'),
       columns: getColumns(),
-      iterations: getIterations()
+      iterations: getIterations(),
+      isSkipPrompt
     };
 
     return project;
@@ -135,7 +148,7 @@ const getProjectItems = async (orglogin: string, projectid: number): Promise<any
   let afterCursor: string = '';
 
   try {
-    while(hasNextPage) {
+    while (hasNextPage) {
       const result = await graphqlClient(queryProjectItems(orglogin, projectid, afterCursor, STEP));
       const items: any = _.get(result, 'organization.projectV2.items');
       const pageInfo: any = items.pageInfo;
@@ -145,7 +158,7 @@ const getProjectItems = async (orglogin: string, projectid: number): Promise<any
       issues = _.concat(issues, items.nodes);
     }
     // console.log(`[getIssues] total:${total}, issues count: ${_.size(issues)}`);
-    
+
   } catch (error: any) {
     console.log('[getProjectItems] Request failed:', error.request);
     console.log(error.message);
@@ -164,7 +177,7 @@ const isDateInRange = (startDate: string, duration: number): boolean => {
 
 export const getProjectIssues = async (): Promise<GITHUB_ISSUE[]> => {
   const orglogin: string = GITHUB_ORG;
-  const projectid: number = GITHUB_PROJECT_ID; 
+  const projectid: number = GITHUB_PROJECT_ID;
   const FILTER_COLUMNS: string[] = getColumns();
   const FILTER_ITERATIONS: any = getIterations();
 
@@ -172,7 +185,7 @@ export const getProjectIssues = async (): Promise<GITHUB_ISSUE[]> => {
 
   // filter with status names
   let issues: GITHUB_ISSUE[] = _.reduce(items, (result: GITHUB_ISSUE[], item) => {
-    
+
     if (item.type === 'ISSUE' && _.includes(FILTER_COLUMNS, item.fieldValueByName?.name)) {
       const issue: GITHUB_ISSUE = {
         status: item.fieldValueByName?.name,

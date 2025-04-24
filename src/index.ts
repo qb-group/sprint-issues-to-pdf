@@ -1,3 +1,4 @@
+import * as _ from 'lodash';
 import ora from 'ora';
 import { consola } from "consola";
 import { GITHUB_PROJECT, getProjectIssues, getProjectInfo } from './github';
@@ -18,12 +19,17 @@ import { generatePdf } from './pdf';
   }
 
   consola.info(`Github Project: "${projectInfo.title}"`);
+  // consola.info(`\tStatus: "${projectInfo.statusFields}"`);
+  if (_.difference(projectInfo.columns, projectInfo.statusFields).length !== 0) { // isSubset false
+    console.error(`The given status(${projectInfo.columns.join(',')}) are not subset of status fields(${projectInfo.statusFields.join(',')})`)
+    process.exit(-1)
+  }
   consola.info(`Columns: ${projectInfo.columns?.map((column) => `"${column}"`)}`);
   if (projectInfo.iterations) {
     consola.info(`Interations: ${JSON.stringify(projectInfo.iterations)}`);
   }
-  
-  const answer = await consola.prompt("Do you want to proceed?", {
+
+  const answer = projectInfo.isSkipPrompt || await consola.prompt("Do you want to proceed?", {
     type: "confirm",
   });
 
@@ -32,7 +38,7 @@ import { generatePdf } from './pdf';
     const issues = await getProjectIssues();
     spinner.succeed('Load github issues done!');
     // console.log(JSON.stringify(issues));
-  
+
     spinner.start('Generating PDF');
     const results: string[] = await generatePdf(projectInfo, issues);
     // const results: string[] = await generatePdf(projectInfo, GithubMockupJson);
